@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17382e">
+  <meta name="description" content="كاشير AI — نقطة بيع عربية بتعرّف ذكي على المنتجات، مسح باركود، أكواد QR، وتقارير مبيعات تعمل محليًا في متصفحك.">
+  <title>كاشير AI — بقالة رواق</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2317382e'/%3E%3Cpath d='M18 17v30M26 17v30M34 17v22M42 17v30M50 17v22' stroke='%23f6f0e4' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='48' cy='45' r='7' fill='%23e7a93e'/%3E%3C/svg%3E">
+  <link rel="preload" href="assets/fonts/ibm-plex-sans-arabic-400-arabic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/alexandria-700-arabic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#view">انتقل إلى المحتوى</a>
+
+  <div class="app-shell" id="app" aria-live="off">
+    <aside class="rail" id="rail" aria-label="التنقل الرئيسي">
+      <a class="rail-brand" href="#pos" aria-label="كاشير AI — نقطة البيع">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" role="presentation">
+            <rect width="64" height="64" rx="17" fill="currentColor"/>
+            <path d="M17 18v29M25 18v29M33 18v20M41 18v29M49 18v20" stroke="#f8f2e7" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="47" cy="46" r="7" fill="#e7a93e"/>
+          </svg>
+        </span>
+        <span class="rail-brand-copy"><b>كاشير</b><small>AI</small></span>
+      </a>
+      <nav class="rail-nav" id="rail-nav"></nav>
+      <div class="rail-foot" id="rail-foot"></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main class="view" id="view" tabindex="-1">
+        <div class="boot-screen">
+          <div class="boot-mark" aria-hidden="true"></div>
+          <p>نُرتّب الرفوف…</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="toast-region" class="toast-region" role="status" aria-live="polite" popover="manual"></div>
+  <div id="modal-root"></div>
+  <div id="print-area" aria-hidden="true"></div>
+
+  <noscript>
+    <div class="noscript-box">يحتاج كاشير AI إلى JavaScript ليعمل. فعّله ثم أعد تحميل الصفحة.</div>
+  </noscript>
+
+  <script src="assets/vendor/qrcode-generator.js"></script>
+  <script src="assets/vendor/zxing.min.js"></script>
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>

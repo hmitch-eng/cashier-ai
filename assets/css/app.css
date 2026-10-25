@@ -1,0 +1,10 @@
+@charset "UTF-8";
+/* ==========================================================================
+   كاشير AI — modern merchant's ledger
+   Paper, deep olive ink, saffron thread. Every label is a shelf tag.
+   ========================================================================== */
+@import url("./base.css");
+@import url("./shell.css");
+@import url("./views.css");
+@import url("./modals.css");
+@import url("./print.css");

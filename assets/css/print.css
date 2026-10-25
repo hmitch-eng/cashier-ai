@@ -1,0 +1,549 @@
+/* ==========================================================================
+   Print — invoice sheets and the label press
+   ========================================================================== */
+
+#print-area {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  html,
+  body,
+  #print-area {
+    background: #fff !important;
+  }
+
+  html,
+  body {
+    inline-size: auto;
+    block-size: auto;
+    overflow: visible !important;
+    color: #17382e;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    margin: 0;
+    background-image: none !important;
+    font-size: 9pt;
+  }
+
+  body.has-modal {
+    overflow: visible !important;
+  }
+
+  #app,
+  #rail,
+  .topbar,
+  .skip-link,
+  #toast-region,
+  .toast-region,
+  #modal-root,
+  dialog,
+  noscript,
+  .boot-screen {
+    display: none !important;
+  }
+
+  dialog::backdrop {
+    display: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
+  #print-area {
+    display: block !important;
+  }
+
+  .print-sheet {
+    inline-size: 100%;
+    margin: 0;
+    padding: 0;
+    color: #17382e;
+    background: #fff;
+    font-family: var(--font-body);
+    font-size: 9pt;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-sheet + .print-sheet {
+    break-before: page;
+  }
+
+  .print-sheet a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .print-sheet svg {
+    overflow: visible;
+  }
+
+  /* Invoice ---------------------------------------------------------------- */
+  .print-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8mm;
+    padding-block-end: 5mm;
+    border-block-end: 0.7mm solid #17382e;
+  }
+
+  .print-store {
+    display: flex;
+    align-items: flex-start;
+    gap: 4mm;
+    min-inline-size: 0;
+  }
+
+  .print-brand-mark {
+    flex: none;
+    inline-size: 14mm;
+    block-size: 14mm;
+  }
+
+  .print-eyebrow {
+    display: block;
+    color: #9c6c16;
+    font-family: var(--font-mono);
+    font-size: 6.8pt;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    line-height: 1.5;
+  }
+
+  .print-store h1 {
+    margin-block: 0.8mm 0.4mm;
+    color: #0e251d;
+    font-family: var(--font-display);
+    font-size: 16pt;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+  }
+
+  .print-store p {
+    color: #58675b;
+    font-size: 8pt;
+    line-height: 1.5;
+  }
+
+  .print-invoice-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex: none;
+    gap: 0.4mm;
+    text-align: end;
+  }
+
+  .print-invoice-meta > span {
+    color: #58675b;
+    font-family: var(--font-mono);
+    font-size: 6.6pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .print-invoice-meta strong {
+    color: #0e251d;
+    font-family: var(--font-mono);
+    font-size: 15pt;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  .print-invoice-meta small {
+    color: #7c877a;
+    font-size: 7.6pt;
+  }
+
+  .print-details {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-block: 5mm;
+    border-block: 0.25mm solid #d8cebb;
+  }
+
+  .print-details > div {
+    min-inline-size: 0;
+    padding: 2.3mm 3mm;
+  }
+
+  .print-details > div + div {
+    border-inline-start: 0.25mm solid #e4dbc9;
+  }
+
+  .print-details span {
+    display: block;
+    color: #7c877a;
+    font-size: 6.6pt;
+    line-height: 1.5;
+  }
+
+  .print-details strong {
+    display: block;
+    margin-block-start: 0.3mm;
+    color: #17382e;
+    font-size: 8.4pt;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  .print-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 8.3pt;
+  }
+
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  .print-table th {
+    padding: 2mm 2mm;
+    border: 0.25mm solid #cfc4af;
+    background: #f1e9d8 !important;
+    color: #17382e;
+    font-size: 7.3pt;
+    font-weight: 600;
+    text-align: start;
+  }
+
+  .print-table th:nth-child(1) {
+    inline-size: 37%;
+  }
+
+  .print-table th:nth-child(2) {
+    inline-size: 20%;
+  }
+
+  .print-table th:nth-child(3) {
+    inline-size: 8%;
+  }
+
+  .print-table th:nth-child(4) {
+    inline-size: 17%;
+  }
+
+  .print-table th:nth-child(5) {
+    inline-size: 18%;
+  }
+
+  .print-table td {
+    padding: 2.2mm 2mm;
+    border-block-end: 0.2mm solid #e3dac8;
+    color: #17382e;
+    font-size: 8.2pt;
+    line-height: 1.5;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+
+  .print-table tbody tr:nth-child(even) td {
+    background: #fbf8f0 !important;
+  }
+
+  .print-table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-table td:nth-child(2) {
+    color: #58675b;
+    font-family: var(--font-mono);
+    font-size: 7.2pt;
+    letter-spacing: 0.02em;
+  }
+
+  .print-table td:nth-child(3),
+  .print-table td:nth-child(4),
+  .print-table td:nth-child(5) {
+    text-align: end;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  .print-table td:nth-child(5) {
+    color: #0e251d;
+    font-weight: 500;
+  }
+
+  .print-row-number {
+    display: inline-block;
+    inline-size: 5mm;
+    color: #9c6c16;
+    font-family: var(--font-mono);
+    font-size: 6.6pt;
+  }
+
+  .print-footer {
+    display: flex;
+    align-items: flex-start;
+    gap: 8mm;
+    margin-block-start: 6mm;
+    padding-block-start: 5mm;
+    border-block-start: 0.7mm solid #17382e;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-thanks {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  .print-thanks h2 {
+    margin-block: 0.8mm 1mm;
+    color: #0e251d;
+    font-family: var(--font-display);
+    font-size: 12pt;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .print-thanks > p {
+    color: #7c877a;
+    font-size: 7.6pt;
+    line-height: 1.6;
+  }
+
+  .print-qr-note {
+    display: inline-flex;
+    max-inline-size: 100%;
+    align-items: center;
+    gap: 4mm;
+    margin-block-start: 4mm;
+    padding: 2.5mm;
+    border: 0.25mm dashed #cfc4af;
+    border-radius: 1mm;
+    background: #fbf7ee !important;
+  }
+
+  .print-qr-code {
+    flex: none;
+    inline-size: 22mm;
+    padding: 1.2mm;
+    border: 0.25mm solid #d8cebb;
+    background: #fff !important;
+  }
+
+  .print-qr-code .qr-svg {
+    inline-size: 100%;
+    block-size: auto;
+  }
+
+  .print-qr-note strong {
+    display: block;
+    margin-block-end: 0.6mm;
+    color: #17382e;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+
+  .print-payload {
+    max-inline-size: 64mm;
+    color: #58675b;
+    font-family: var(--font-mono);
+    font-size: 5.6pt;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .print-totals {
+    flex: 0 0 60mm;
+    padding: 3mm;
+    border: 0.3mm solid #cfc4af;
+    border-radius: 1.2mm;
+    background: #fbf7ee !important;
+    font-size: 8.2pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-totals > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 3mm;
+    padding-block: 0.8mm;
+  }
+
+  .print-totals span {
+    color: #58675b;
+    font-size: 7.4pt;
+  }
+
+  .print-totals strong {
+    color: #17382e;
+    font-family: var(--font-mono);
+    font-size: 8.2pt;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .print-totals .print-grand {
+    margin: 2mm -3mm -3mm;
+    padding: 2.6mm 3mm;
+    background: #17382e !important;
+    color: #f8f2e7;
+  }
+
+  .print-totals .print-grand:has(+ .print-cash) {
+    margin-block-end: 0;
+  }
+
+  .print-totals .print-grand + .print-cash {
+    margin-block-start: 1.2mm;
+    border-block-start: 0.2mm dashed #d8cebb;
+  }
+
+  .print-totals .print-grand span {
+    color: rgba(248, 242, 231, 0.75);
+    font-size: 7.6pt;
+    font-weight: 600;
+  }
+
+  .print-totals .print-grand strong {
+    color: #f3c06a;
+    font-size: 10.4pt;
+    font-weight: 500;
+  }
+
+  .print-totals .print-cash span,
+  .print-totals .print-cash strong {
+    color: #7c877a;
+    font-size: 6.8pt;
+  }
+
+  /* Product labels --------------------------------------------------------- */
+  .labels-sheet {
+    break-inside: auto;
+  }
+
+  .labels-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3mm;
+    align-content: start;
+  }
+
+  .labels-grid .product-label {
+    container-type: normal;
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    block-size: 42mm;
+    aspect-ratio: auto;
+    padding: 2.4mm 2.6mm 1.8mm;
+    overflow: hidden;
+    rotate: none;
+    border: 0.25mm solid #a89e8b;
+    border-radius: 1.2mm;
+    background: #fffef9 !important;
+    color: #17382e;
+    box-shadow: none;
+    font-family: var(--font-body);
+    line-height: 1.25;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .labels-grid .product-label::before {
+    block-size: 0.8mm;
+    background: linear-gradient(90deg, #e6a63b 0 26%, #17382e 26% 100%) !important;
+  }
+
+  .labels-grid .product-label-head {
+    gap: 2mm;
+    padding-block: 0.3mm 1mm;
+    color: #325145;
+    font-size: 5.8pt;
+    font-weight: 600;
+  }
+
+  .labels-grid .product-label-head small {
+    font-size: 5pt;
+    letter-spacing: 0.06em;
+  }
+
+  .labels-grid .product-label-name {
+    padding-block-end: 1mm;
+    color: #0e251d;
+    font-family: var(--font-display);
+    font-size: 8.5pt;
+    font-weight: 700;
+    line-height: 1.2;
+    -webkit-line-clamp: 2;
+  }
+
+  .labels-grid .product-label-main {
+    grid-template-columns: 16.5mm minmax(0, 1fr);
+    gap: 2mm;
+    flex: 1;
+    min-block-size: 0;
+  }
+
+  .labels-grid .product-label-qr {
+    padding: 0.6mm;
+    border: 0.2mm solid #d8cebb;
+    border-radius: 0.7mm;
+    background: #fff !important;
+  }
+
+  .labels-grid .product-label-info {
+    gap: 0.6mm;
+  }
+
+  .labels-grid .product-label-price {
+    color: #0e251d;
+    font-family: var(--font-mono);
+    font-size: 10pt;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .labels-grid .product-label-category {
+    font-size: 5.2pt;
+  }
+
+  .labels-grid .product-label-barcode {
+    gap: 0.2mm;
+    padding-block-start: 0.8mm;
+    border-block-start: 0.2mm dashed #d8cebb;
+  }
+
+  .labels-grid .product-label-barcode .ean-svg {
+    inline-size: 100%;
+    block-size: 5.2mm;
+    color: #0e251d;
+  }
+
+  .labels-grid .product-label-barcode .barcode-digits {
+    color: #325145;
+    font-size: 3.8pt;
+    letter-spacing: 0.07em;
+  }
+
+  .labels-grid .product-label-foot {
+    gap: 2mm;
+    padding-block-start: 1mm;
+    color: #7c877a;
+    font-size: 4.4pt;
+  }
+
+  /* Generated QR fallback -------------------------------------------------- */
+  .qr-fallback {
+    border: 0.2mm solid #cfc4af;
+    font-size: 4pt;
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "cashier-ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "كاشير AI — نقطة بيع عربية بتعرّف ذكي على المنتجات وQR وإدارة مخزون.",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.js"
+  }
+}
