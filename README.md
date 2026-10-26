@@ -79,6 +79,13 @@ npm test
 
 ![رفيق السلة — اقتراحات مبنية على فواتير المتجر](docs/screenshots/store-memory-cart-companions.png)
 
+<details>
+<summary>عرض الجوال</summary>
+
+![رفيق السلة على الجوال](docs/screenshots/store-memory-cart-companions-mobile.png)
+
+</details>
+
 ### مسح الباركود
 
 - اضغط زر «مسح» أو **F2** لفتح الكاميرا، ثم وجّهها إلى الباركود. يستخدم التطبيق `BarcodeDetector` عند توفّره، وإلا يعتمد على ZXing المرفق محليًا.
@@ -101,6 +108,13 @@ npm test
 
 ![نبض الرف — تغطية الأصناف وكميات إعادة التزويد](docs/screenshots/store-memory-shelf-pulse.png)
 
+<details>
+<summary>عرض الجوال</summary>
+
+![نبض الرف على الجوال](docs/screenshots/store-memory-shelf-pulse-mobile.png)
+
+</details>
+
 - صور المنتجات وبياناتها تُحفظ محليًا؛ حذف منتج لا يغيّر الفواتير السابقة.
 - لطباعة الملصقات: افتح «ملصقات المنتجات»، حدّد الأصناف وعدد النسخ لكل صنف (1–6)، راجع المعاينة، ثم اطبع. تُرتب الملصقات ثلاثة في الصف على ورق A4، ويحمل كل ملصق الاسم والسعر وQR وEAN-13.
 
@@ -115,6 +129,13 @@ npm test
 - **نبض المتجر:** شريط أعلى التقارير يلخّص الأقرب للنفاد، الأكثر شراءً معًا، والفئة الأولى بالتزويد، مع رابط سريع إلى المخزون. تعتمد القراءة على نافذة 14 يومًا مستقلة عن مدة التقرير وتذكرها صراحة.
 
 ![نبض المتجر — ملخص محلي من فواتير المتصفح](docs/screenshots/store-memory-store-pulse.png)
+
+<details>
+<summary>عرض الجوال</summary>
+
+![نبض المتجر على الجوال](docs/screenshots/store-memory-store-pulse-mobile.png)
+
+</details>
 
 ![صفحة التقارير](docs/screenshots/reports.png)
 
