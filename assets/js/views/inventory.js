@@ -1,3 +1,4 @@
+import { stockPulse } from '../analytics.js';
 import { ean13Svg } from '../ean.js';
 import { icon } from '../icons.js';
 import {
@@ -10,6 +11,8 @@ import {
 import {
   escapeAttr,
   escapeHtml,
+  formatDaySpan,
+  formatInvoiceCount,
   formatMoney,
   formatNumber,
   normalizeSearch,
@@ -55,6 +58,141 @@ function stockMeter(product) {
   `;
 }
 
+function coverageLabel(item) {
+  if (item.urgency === 'out') return 'نفد من الرف';
+  if (item.coverageDays === null) return 'حركة بطيئة';
+  if (item.coverageDays < 1) return 'أقل من يوم';
+  if (item.coverageDays > 60) return 'أكثر من شهرين';
+  return `يكفي ${formatDaySpan(item.coverageDays)}`;
+}
+
+function renderCoverage(item, windowDays) {
+  if (!item) return '';
+  if (!item.hasSignal) {
+    if (item.stock <= 0) return '';
+    return `<span class="stock-status-note">${item.sold > 0 ? 'بيانات قليلة' : 'بلا حركة حديثة'}</span>`;
+  }
+  const tone =
+    item.urgency === 'out' || item.urgency === 'critical'
+      ? 'danger'
+      : item.urgency === 'watch'
+        ? 'warning'
+        : 'calm';
+  const tooltip = `محسوب من ${formatNumber(item.sold)} قطعة في ${formatInvoiceCount(item.orders)} خلال ${formatDaySpan(windowDays)}`;
+  return `
+    <span class="stock-cover stock-cover--${tone}" title="${escapeAttr(tooltip)}">
+      ${icon('clock', { size: 11 })}
+      <span>${escapeHtml(coverageLabel(item))}</span>
+    </span>
+    ${
+      item.suggestedRestock > 0
+        ? `<button type="button" class="stock-order" data-action="restock-product" data-id="${escapeAttr(item.productId)}" data-qty="${escapeAttr(String(item.suggestedRestock))}" title="أعد طلب ${escapeAttr(formatNumber(item.suggestedRestock))} قطعة" aria-label="أعد طلب ${escapeAttr(formatNumber(item.suggestedRestock))} من ${escapeAttr(item.product.name)}">${icon('cartPlus', { size: 12 })}<span>أعد ${escapeHtml(formatNumber(item.suggestedRestock))}</span></button>`
+        : ''
+    }
+  `;
+}
+
+function renderShelfPulse(pulse, lowCount, outCount) {
+  if (!pulse.items.length) return '';
+
+  if (!pulse.historyEnough) {
+    return `
+      <aside class="shelf-pulse shelf-pulse--learning" aria-label="نبض الرف — يتعلّم من فواتيرك">
+        <span class="shelf-pulse-icon">${icon('clock', { size: 22 })}</span>
+        <div class="shelf-pulse-lead">
+          <span class="eyebrow">نبض الرف · يتعلّم</span>
+          <h2>أحتاج بضع فواتير لأقرأ الرف</h2>
+          <p>بعد ${formatNumber(pulse.minInvoices)} فواتير سأقيس سرعة البيع وأيام التغطية لكل صنف. لديك ${formatNumber(pulse.invoiceCount)} حتى الآن.</p>
+          <div class="shelf-pulse-meta">
+            <span>${icon('alert', { size: 12 })} ${formatNumber(outCount)} نافد</span>
+            <span>${icon('package', { size: 12 })} ${formatNumber(lowCount)} منخفض</span>
+          </div>
+        </div>
+        <div class="shelf-pulse-actions">
+          ${outCount ? `<button type="button" class="btn btn--ghost btn--small" data-action="set-stock-filter" data-filter="out">اعرض النافد</button>` : ''}
+          ${lowCount ? `<button type="button" class="btn btn--ghost btn--small" data-action="set-stock-filter" data-filter="low">اعرض المنخفض</button>` : ''}
+        </div>
+      </aside>
+    `;
+  }
+
+  const urgent = pulse.urgent.slice(0, 3);
+  const remaining = pulse.urgent.length - urgent.length;
+  const hasUrgent = pulse.urgent.length > 0;
+  const title = hasUrgent
+    ? pulse.urgent.length === 1
+      ? 'صنف واحد يحتاج قراراً'
+      : pulse.urgent.length === 2
+        ? 'صنفان يحتاجان قراراً'
+        : `${formatNumber(pulse.urgent.length)} أصناف تحتاج قراراً`
+    : 'لا صنف على وشك النفاد';
+  const description = hasUrgent
+    ? 'التغطية محسوبة من فواتيرك، والكمية المقترحة تكفي أسبوعين.'
+    : pulse.fastest
+      ? `أقرب صنف هو «${escapeHtml(pulse.fastest.product.name)}» ويكفي ${pulse.fastest.coverageDays > 60 ? 'أكثر من شهرين' : formatDaySpan(pulse.fastest.coverageDays)}.`
+      : 'لا إشارات نفاد عاجلة، وأتابع الرف تلقائياً مع كل فاتورة.';
+
+  return `
+    <aside class="shelf-pulse ${hasUrgent ? '' : 'shelf-pulse--clear'}" aria-label="نبض الرف — قراءة محلية من الفواتير">
+      <div class="shelf-pulse-lead">
+        <span class="eyebrow">نبض الرف · قراءة محلية</span>
+        <h2>${escapeHtml(title)}</h2>
+        <p>${description}</p>
+        <div class="shelf-pulse-meta">
+          <span>${icon('receipt', { size: 12 })} ${formatInvoiceCount(pulse.invoiceCount)}</span>
+          <span>${icon('calendar', { size: 12 })} ${formatDaySpan(pulse.windowDays)}</span>
+          ${pulse.suggestedUnits > 0 ? `<span>${icon('package', { size: 12 })} ${formatNumber(pulse.suggestedUnits)} قطعة مقترحة</span>` : ''}
+        </div>
+      </div>
+
+      ${
+        hasUrgent
+          ? `<div class="shelf-pulse-board">
+              <div class="shelf-pulse-list">
+                ${urgent
+                  .map((item) => {
+                    const meta = `${formatNumber(item.sold)} قطعة في ${formatInvoiceCount(item.orders)}`;
+                    return `
+                      <article class="shelf-pulse-item shelf-pulse-item--${escapeAttr(item.urgency)}">
+                        ${productVisual(item.product, { className: 'pulse-art' })}
+                        <div class="pulse-copy">
+                          <span class="pulse-cat">${escapeHtml(item.product.category)}</span>
+                          <strong>${escapeHtml(item.product.name)}</strong>
+                          <span class="pulse-line">
+                            ${icon('clock', { size: 11 })}
+                            ${escapeHtml(coverageLabel(item))}
+                            <span class="pulse-sep" aria-hidden="true"></span>
+                            ${escapeHtml(meta)}
+                          </span>
+                        </div>
+                        ${
+                          item.suggestedRestock > 0
+                            ? `<button type="button" class="pulse-order" data-action="restock-product" data-id="${escapeAttr(item.productId)}" data-qty="${escapeAttr(String(item.suggestedRestock))}" aria-label="أعد طلب ${escapeAttr(formatNumber(item.suggestedRestock))} من ${escapeAttr(item.product.name)}"><span>أعد طلب</span><strong class="mono">${escapeHtml(formatNumber(item.suggestedRestock))}</strong></button>`
+                            : `<button type="button" class="pulse-edit" data-action="edit-product" data-id="${escapeAttr(item.productId)}" aria-label="راجع ${escapeAttr(item.product.name)}">${icon('edit', { size: 14 })}<span>راجع</span></button>`
+                        }
+                      </article>
+                    `;
+                  })
+                  .join('')}
+              </div>
+              ${
+                remaining > 0
+                  ? `<span class="shelf-pulse-more">${icon('more', { size: 14 })} ${formatNumber(remaining)} ${remaining === 1 ? 'صنف آخر' : 'أصناف أخرى'} تحتاج مراجعة في الدفتر</span>`
+                  : ''
+              }
+            </div>`
+          : `<div class="shelf-pulse-board shelf-pulse-board--calm">
+              <span class="shelf-pulse-clear-icon">${icon('checkCircle', { size: 22 })}</span>
+              <div>
+                <strong>كل الأصناف المتتبعة فوق أسبوع من التغطية</strong>
+                <p>سأعيد الحساب تلقائياً بعد كل فاتورة جديدة.</p>
+              </div>
+            </div>`
+      }
+    </aside>
+  `;
+}
+
 function renderStats(products, settings) {
   const units = products.reduce((sum, product) => sum + product.stock, 0);
   const costValue = roundMoney(products.reduce((sum, product) => sum + product.cost * product.stock, 0));
@@ -91,10 +229,11 @@ function renderStats(products, settings) {
   `;
 }
 
-function renderRow(product, settings) {
+function renderRow(product, settings, coverage, windowDays) {
   const margin = marginOf(product);
   const state = stockState(product);
   const soldOut = product.stock <= 0;
+  const coverageNote = renderCoverage(coverage, windowDays);
   return `
     <div class="stock-row" role="row" data-product-row="${escapeAttr(product.id)}">
       <div class="stock-product" role="cell">
@@ -132,7 +271,11 @@ function renderRow(product, settings) {
 
       <div class="stock-status" role="cell">
         ${stockPill(product)}
-        <span class="stock-status-note">${state.key === 'out' ? 'يحتاج تزويداً' : state.key === 'low' ? `الحد ${formatNumber(product.lowStock)}` : 'فوق الحد'}</span>
+        ${
+          coverageNote
+            ? coverageNote
+            : `<span class="stock-status-note">${state.key === 'out' ? 'يحتاج تزويداً' : state.key === 'low' ? `الحد ${formatNumber(product.lowStock)}` : 'فوق الحد'}</span>`
+        }
       </div>
 
       <div class="stock-actions" role="cell">
@@ -159,6 +302,9 @@ export function renderInventory(state, ui = {}) {
   const lowCount = state.products.filter(
     (product) => product.stock > 0 && product.stock <= product.lowStock
   ).length;
+  const outCount = state.products.filter((product) => product.stock <= 0).length;
+  const pulse = stockPulse(state.invoices, state.products);
+  const coverageById = new Map(pulse.items.map((entry) => [entry.productId, entry]));
   const resultLabel = `${formatNumber(visible.length)} ${visible.length === 1 ? 'صنف' : 'أصناف'}`;
   const lead = renderPageLead({
     eyebrow: 'دفتر المخزون · نظرة سريعة',
@@ -176,16 +322,7 @@ export function renderInventory(state, ui = {}) {
     <section class="page page--inventory" data-page="inventory">
       ${lead}
       ${renderStats(state.products, settings)}
-
-      ${
-        lowCount
-          ? `<div class="attention-note">
-              ${icon('alert', { size: 18 })}
-              <p><strong>${escapeHtml(formatNumber(lowCount))} ${lowCount === 1 ? 'صنف يحتاج' : 'أصناف تحتاج'} تزويداً.</strong> راجعها قبل أن تنفد من الرف.</p>
-              <button type="button" class="text-btn" data-action="set-stock-filter" data-filter="low">اعرضها فقط ${icon('arrowLeft', { size: 14 })}</button>
-            </div>`
-          : ''
-      }
+      ${renderShelfPulse(pulse, lowCount, outCount)}
 
       <div class="ledger-panel">
         <div class="ledger-toolbar">
@@ -239,7 +376,7 @@ export function renderInventory(state, ui = {}) {
                   <span role="columnheader">الحالة</span>
                   <span role="columnheader" class="sr-only">إجراءات</span>
                 </div>
-                ${visible.map((product) => renderRow(product, settings)).join('')}
+                ${visible.map((product) => renderRow(product, settings, coverageById.get(product.id), pulse.windowDays)).join('')}
               </div>`
             : `<div class="ledger-empty">
                 ${icon('package', { size: 28 })}

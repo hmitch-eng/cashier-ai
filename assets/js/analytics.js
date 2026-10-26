@@ -1,6 +1,310 @@
 import { addDays, dayKey, formatDay, formatShortDate, parseDate, roundMoney, startOfDay } from './util.js';
 import { PAYMENT_LABELS } from './constants.js';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const URGENCY_ORDER = { out: 0, critical: 1, watch: 2 };
+const MIN_HISTORY_INVOICES = 3;
+
+function activityWindow(invoices, days, now) {
+  const windowInvoices = invoicesInLastDays(invoices, days, now);
+  if (!windowInvoices.length) return { invoices: [], windowDays: 0 };
+  const today = startOfDay(now);
+  let earliest = today;
+  for (const invoice of windowInvoices) {
+    const date = startOfDay(parseDate(invoice.date));
+    if (date < earliest) earliest = date;
+  }
+  const elapsed = Math.max(1, Math.round((today.getTime() - earliest.getTime()) / DAY_MS) + 1);
+  return { invoices: windowInvoices, windowDays: Math.min(days, elapsed) };
+}
+
+function lineKey(item) {
+  return String(item?.productId || item?.barcode || item?.name || '').trim();
+}
+
+function lineMeta(item, fallbackKey) {
+  return {
+    productId: String(item?.productId || fallbackKey),
+    name: String(item?.name || 'منتج'),
+    category: String(item?.category || 'غير مصنف'),
+    art: String(item?.art || 'pantry'),
+    image: typeof item?.image === 'string' ? item.image : null
+  };
+}
+
+export function stockPulse(invoices = [], products = [], {
+  days = 14,
+  targetDays = 14,
+  now = new Date(),
+  minInvoices = MIN_HISTORY_INVOICES,
+  minUnits = 2
+} = {}) {
+  const { invoices: windowInvoices, windowDays } = activityWindow(invoices, days, now);
+  const units = new Map();
+  const orders = new Map();
+
+  for (const invoice of windowInvoices) {
+    const seen = new Set();
+    for (const item of invoice.items || []) {
+      const key = String(item?.productId || '');
+      if (!key) continue;
+      const quantity = Math.max(0, Number(item.quantity) || 0);
+      units.set(key, (units.get(key) || 0) + quantity);
+      if (!seen.has(key)) {
+        orders.set(key, (orders.get(key) || 0) + 1);
+        seen.add(key);
+      }
+    }
+  }
+
+  const historyEnough = windowInvoices.length >= minInvoices;
+  const items = products.map((product) => {
+    const key = String(product.id);
+    const stock = Math.max(0, Number(product.stock) || 0);
+    const sold = roundMoney(units.get(key) || 0);
+    const orderCount = orders.get(key) || 0;
+    const hasSignal = historyEnough && sold >= minUnits;
+    const dailyVelocity = hasSignal && windowDays > 0 ? roundMoney(sold / windowDays) : 0;
+    const coverageDays = !hasSignal
+      ? null
+      : stock <= 0
+        ? 0
+        : dailyVelocity > 0
+          ? Math.round((stock / dailyVelocity) * 10) / 10
+          : null;
+    const targetStock = hasSignal ? Math.ceil(dailyVelocity * targetDays) : 0;
+    const suggestedRestock = hasSignal ? Math.max(0, Math.ceil(targetStock - stock)) : 0;
+    let urgency = 'quiet';
+    if (stock <= 0) urgency = 'out';
+    else if (hasSignal && coverageDays <= 3) urgency = 'critical';
+    else if (hasSignal && coverageDays <= 7) urgency = 'watch';
+    else if (hasSignal) urgency = 'stable';
+
+    return {
+      product,
+      productId: key,
+      stock,
+      sold,
+      orders: orderCount,
+      hasSignal,
+      confidence: hasSignal ? 'good' : sold > 0 ? 'thin' : 'none',
+      dailyVelocity,
+      coverageDays,
+      targetStock,
+      targetDays,
+      suggestedRestock,
+      urgency
+    };
+  });
+
+  const urgent = items
+    .filter((item) => item.urgency in URGENCY_ORDER)
+    .sort(
+      (a, b) =>
+        URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency] ||
+        a.coverageDays - b.coverageDays ||
+        b.sold - a.sold ||
+        a.product.name.localeCompare(b.product.name, 'ar')
+    );
+
+  const tracked = items.filter((item) => item.hasSignal && item.coverageDays !== null);
+  const fastest =
+    urgent[0] ||
+    tracked
+      .slice()
+      .sort(
+        (a, b) =>
+          a.coverageDays - b.coverageDays ||
+          b.sold - a.sold ||
+          a.product.name.localeCompare(b.product.name, 'ar')
+      )[0] ||
+    null;
+
+  const categories = new Map();
+  for (const item of urgent) {
+    const name = item.product.category || 'غير مصنف';
+    const entry = categories.get(name) || { name, count: 0, suggestedUnits: 0 };
+    entry.count += 1;
+    entry.suggestedUnits += item.suggestedRestock;
+    categories.set(name, entry);
+  }
+  const focusCategory =
+    [...categories.values()].sort(
+      (a, b) =>
+        b.count - a.count ||
+        b.suggestedUnits - a.suggestedUnits ||
+        a.name.localeCompare(b.name, 'ar')
+    )[0] || null;
+
+  return {
+    windowDays,
+    targetDays,
+    invoiceCount: windowInvoices.length,
+    historyEnough,
+    minInvoices,
+    items,
+    urgent,
+    tracked: tracked.length,
+    fastest,
+    focusCategory,
+    suggestedUnits: items.reduce((sum, item) => sum + item.suggestedRestock, 0)
+  };
+}
+
+export function purchasePairInsights(invoices = [], {
+  days = 30,
+  now = new Date(),
+  limit = 5,
+  minSupport = 2
+} = {}) {
+  const { invoices: windowInvoices, windowDays } = activityWindow(invoices, days, now);
+  const pairs = new Map();
+
+  for (const invoice of windowInvoices) {
+    const unique = new Map();
+    for (const item of invoice.items || []) {
+      const key = lineKey(item);
+      if (!key || unique.has(key)) continue;
+      unique.set(key, lineMeta(item, key));
+    }
+    const entries = [...unique.entries()].sort(([a], [b]) => a.localeCompare(b));
+    for (let first = 0; first < entries.length; first += 1) {
+      for (let second = first + 1; second < entries.length; second += 1) {
+        const [firstKey, firstMeta] = entries[first];
+        const [secondKey, secondMeta] = entries[second];
+        const key = `${firstKey}::${secondKey}`;
+        const entry = pairs.get(key) || {
+          key,
+          productIds: [firstKey, secondKey],
+          products: [firstMeta, secondMeta],
+          count: 0
+        };
+        entry.count += 1;
+        pairs.set(key, entry);
+      }
+    }
+  }
+
+  const result = [...pairs.values()]
+    .filter((pair) => pair.count >= minSupport)
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .slice(0, limit);
+
+  return {
+    windowDays,
+    invoiceCount: windowInvoices.length,
+    pairs: result
+  };
+}
+
+export function cartCompanions(invoices = [], products = [], cartProductIds = [], {
+  days = 30,
+  now = new Date(),
+  limit = 3,
+  minSupport = 2,
+  minInvoices = MIN_HISTORY_INVOICES
+} = {}) {
+  const cartIds = new Set((cartProductIds || []).map((id) => String(id)).filter(Boolean));
+  if (!cartIds.size || !products.length) {
+    return { mode: 'none', suggestions: [], windowDays: 0, invoiceCount: 0, historyEnough: false };
+  }
+
+  const productMap = new Map(products.map((product) => [String(product.id), product]));
+  const { invoices: windowInvoices, windowDays } = activityWindow(invoices, days, now);
+  const invoiceCount = windowInvoices.length;
+  const historyEnough = invoiceCount >= minInvoices;
+  const coPurchases = new Map();
+
+  for (const invoice of windowInvoices) {
+    const unique = new Map();
+    for (const item of invoice.items || []) {
+      const key = lineKey(item);
+      if (!key || unique.has(key)) continue;
+      unique.set(key, item);
+    }
+    const ids = [...unique.keys()];
+    if (!ids.some((id) => cartIds.has(id))) continue;
+    for (const id of ids) {
+      if (cartIds.has(id)) continue;
+      coPurchases.set(id, (coPurchases.get(id) || 0) + 1);
+    }
+  }
+
+  const paired = [];
+  for (const [id, support] of coPurchases) {
+    const product = productMap.get(id);
+    if (!product || Number(product.stock) <= 0 || support < minSupport) continue;
+    paired.push({ product, support, source: 'pair', categoryMatch: false });
+  }
+  paired.sort(
+    (a, b) =>
+      b.support - a.support ||
+      a.product.name.localeCompare(b.product.name, 'ar')
+  );
+
+  if (paired.length) {
+    return {
+      mode: 'pair',
+      suggestions: paired.slice(0, limit),
+      windowDays,
+      invoiceCount,
+      historyEnough
+    };
+  }
+
+  if (!historyEnough) {
+    return { mode: 'none', suggestions: [], windowDays, invoiceCount, historyEnough };
+  }
+
+  const units = new Map();
+  for (const invoice of windowInvoices) {
+    for (const item of invoice.items || []) {
+      const key = lineKey(item);
+      if (!key) continue;
+      units.set(key, (units.get(key) || 0) + Math.max(0, Number(item.quantity) || 0));
+    }
+  }
+
+  const cartCategories = new Set(
+    [...cartIds]
+      .map((id) => productMap.get(id)?.category)
+      .filter(Boolean)
+  );
+  const candidates = products
+    .map((product) => ({
+      product,
+      units: units.get(String(product.id)) || 0,
+      categoryMatch: cartCategories.has(product.category)
+    }))
+    .filter(
+      (entry) =>
+        !cartIds.has(String(entry.product.id)) &&
+        Number(entry.product.stock) > 0 &&
+        entry.units > 0
+    );
+  const preferred = candidates.filter((entry) => entry.categoryMatch);
+  const pool = (preferred.length ? preferred : candidates)
+    .sort(
+      (a, b) =>
+        b.units - a.units ||
+        a.product.name.localeCompare(b.product.name, 'ar')
+    )
+    .slice(0, limit);
+
+  return {
+    mode: pool.length ? 'bestseller' : 'none',
+    suggestions: pool.map((entry) => ({
+      product: entry.product,
+      support: entry.units,
+      source: 'bestseller',
+      categoryMatch: entry.categoryMatch
+    })),
+    windowDays,
+    invoiceCount,
+    historyEnough
+  };
+}
+
 export function invoicesInLastDays(invoices, days, now = new Date(), offsetPeriods = 0) {
   const today = startOfDay(now);
   const end = addDays(today, 1 - offsetPeriods * days);

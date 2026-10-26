@@ -3,8 +3,10 @@ import {
   categoryBreakdown,
   paymentBreakdown,
   profitMargin,
+  purchasePairInsights,
   rangeSummary,
   salesByDay,
+  stockPulse,
   topProducts
 } from '../analytics.js';
 import {
@@ -19,6 +21,8 @@ import {
   escapeAttr,
   escapeHtml,
   formatDate,
+  formatDaySpan,
+  formatInvoiceCount,
   formatMoney,
   formatNumber
 } from '../util.js';
@@ -234,6 +238,72 @@ function renderCategories(categories, settings) {
   `;
 }
 
+function renderStorePulse(stock, pairInsights) {
+  if (!stock.invoiceCount) return '';
+
+  if (!stock.historyEnough) {
+    return `
+      <aside class="store-pulse store-pulse--learning" aria-label="نبض المتجر — يتشكل من فواتيرك">
+        <span class="store-pulse-icon">${icon('clock', { size: 21 })}</span>
+        <div class="store-pulse-learning-copy">
+          <span class="eyebrow">نبض المتجر · يتشكل</span>
+          <h2>القراءة تحتاج ${formatNumber(stock.minInvoices)} فواتير</h2>
+          <p>لديك ${formatNumber(stock.invoiceCount)} حتى الآن. بعدها سأربط نفاد الرف بسرعة البيع وأكشف الأصناف التي تُشترى معاً.</p>
+        </div>
+      </aside>
+    `;
+  }
+
+  const fastest = stock.fastest;
+  const pair = pairInsights.pairs[0] || null;
+  const focus = stock.focusCategory;
+  const fastestValue = fastest ? fastest.product.name : 'لا صنف متتبع';
+  const fastestNote = !fastest
+    ? 'أحتاج حركة بيع أوضح'
+    : fastest.urgency === 'out'
+      ? fastest.suggestedRestock > 0
+        ? `نفد · اقترحنا ${formatNumber(fastest.suggestedRestock)} قطعة`
+        : 'نفد ويحتاج كمية يدوية'
+      : `يكفي ${fastest.coverageDays > 60 ? 'أكثر من شهرين' : formatDaySpan(fastest.coverageDays)}${fastest.suggestedRestock > 0 ? ` · اقتراح ${formatNumber(fastest.suggestedRestock)}` : ''}`;
+  const pairValue = pair
+    ? `${pair.products[0].name} + ${pair.products[1].name}`
+    : 'لا ثنائي واضح بعد';
+  const pairNote = pair
+    ? `ظهرا معاً في ${formatInvoiceCount(pair.count)}`
+    : 'تحتاج فواتير أكثر';
+  const focusNote = focus
+    ? `${focus.count === 1 ? 'صنف واحد' : `${formatNumber(focus.count)} أصناف`} · ${formatNumber(focus.suggestedUnits)} قطعة مقترحة`
+    : 'كل الفئات تحت السيطرة';
+
+  return `
+    <aside class="store-pulse" aria-label="نبض المتجر — قراءة محلية من الفواتير">
+      <div class="store-pulse-lead">
+        <span class="eyebrow">نبض المتجر · من دفترك</span>
+        <h2>ما تقوله فواتيرك الآن</h2>
+        <p>قراءة محلية من ${formatInvoiceCount(stock.invoiceCount)} خلال ${formatDaySpan(stock.windowDays)}. لا خدمات خارجية.</p>
+        <a class="text-btn" href="#inventory">إلى دفتر المخزون ${icon('arrowLeft', { size: 14 })}</a>
+      </div>
+      <div class="store-pulse-facts">
+        <div class="pulse-fact">
+          <span class="pulse-fact-label">${icon('clock', { size: 13 })} الأقرب للنفاد</span>
+          <strong>${escapeHtml(fastestValue)}</strong>
+          <span class="pulse-fact-note">${escapeHtml(fastestNote)}</span>
+        </div>
+        <div class="pulse-fact">
+          <span class="pulse-fact-label">${icon('bag', { size: 13 })} الأكثر شراءً معاً</span>
+          <strong>${escapeHtml(pairValue)}</strong>
+          <span class="pulse-fact-note">${escapeHtml(pairNote)}</span>
+        </div>
+        <div class="pulse-fact">
+          <span class="pulse-fact-label">${icon('package', { size: 13 })} الفئة الأولى بالتزويد</span>
+          <strong>${escapeHtml(focus ? focus.name : 'لا تزويد عاجل')}</strong>
+          <span class="pulse-fact-note">${escapeHtml(focusNote)}</span>
+        </div>
+      </div>
+    </aside>
+  `;
+}
+
 function renderStockWatch(products) {
   const attention = products
     .filter((product) => product.stock <= product.lowStock)
@@ -283,6 +353,8 @@ export function renderReports(state, ui = {}) {
   const payments = paymentBreakdown(invoices);
   const best = bestSalesDay(state.invoices, days);
   const margin = profitMargin(invoices);
+  const stock = stockPulse(state.invoices, state.products);
+  const pairInsights = purchasePairInsights(state.invoices, { limit: 3 });
   const rangeLabel = days === 7 ? '7 أيام' : '30 يوماً';
   const lead = renderPageLead({
     eyebrow: `دفتر الأرقام · آخر ${formatNumber(days)} ${days === 7 ? 'أيام' : 'يوماً'}`,
@@ -332,6 +404,8 @@ export function renderReports(state, ui = {}) {
           foot: `<span class="metric-note">هامش ${escapeHtml(formatNumber(margin))}٪ على المبيعات</span>`
         })}
       </div>
+
+      ${renderStorePulse(stock, pairInsights)}
 
       ${
         !invoices.length

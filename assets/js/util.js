@@ -47,6 +47,25 @@ export function formatPercent(value, maximumFractionDigits = 0) {
   return `${numberFormatter.format(amount)}٪`;
 }
 
+export function formatDaySpan(value) {
+  const days = Number(value);
+  if (!Number.isFinite(days)) return '0 يوم';
+  if (!Number.isInteger(days)) return `${formatNumber(days)} يوم`;
+  if (days === 1) return 'يوم واحد';
+  if (days === 2) return 'يومان';
+  if (days >= 3 && days <= 10) return `${formatNumber(days)} أيام`;
+  return `${formatNumber(days)} يوماً`;
+}
+
+export function formatInvoiceCount(value) {
+  const count = Math.max(0, Math.round(Number(value) || 0));
+  if (count === 0) return 'لا فواتير';
+  if (count === 1) return 'فاتورة واحدة';
+  if (count === 2) return 'فاتورتين';
+  if (count <= 10) return `${formatNumber(count)} فواتير`;
+  return `${formatNumber(count)} فاتورة`;
+}
+
 export function toArabicDigits(value) {
   return String(value).replace(/\d/g, (digit) => AR_DIGITS[Number(digit)]);
 }

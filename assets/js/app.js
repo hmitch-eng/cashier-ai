@@ -505,6 +505,31 @@ async function deleteProductWithConfirm(productId) {
   toast('حُذف المنتج من المخزون', { tone: 'info', detail: product.name });
 }
 
+async function restockProductWithConfirm(productId, suggestedQuantity) {
+  const product = store.getProduct(productId);
+  if (!product) return;
+  const quantity = Math.max(0, Math.floor(Number(suggestedQuantity) || 0));
+  if (!quantity) {
+    openProductFormModal(store, { product });
+    return;
+  }
+  const nextStock = product.stock + quantity;
+  const confirmed = await confirmDialog({
+    title: 'أعد طلب هذا الصنف؟',
+    message: `سأضيف ${formatNumber(quantity)} قطعة إلى «${product.name}». الكمية مقترحة من سرعة البيع، ويمكنك تعديل المخزون لاحقاً.`,
+    details: `<span>الرصيد الحالي <strong class="num">${escapeHtml(formatNumber(product.stock))}</strong></span><span>بعد التزويد <strong class="num">${escapeHtml(formatNumber(nextStock))}</strong></span>`,
+    confirmLabel: `أضف ${formatNumber(quantity)} قطعة`,
+    tone: 'info'
+  });
+  if (!confirmed) return;
+  store.adjustStock(productId, quantity);
+  feedback();
+  toast(`تزوّد «${product.name}»`, {
+    detail: `${formatNumber(quantity)} قطعة أُضيفت · الرصيد ${formatNumber(nextStock)}`,
+    duration: 3600
+  });
+}
+
 function printInvoiceById(invoiceId) {
   const invoice = store.state.invoices.find((entry) => entry.id === invoiceId);
   if (!invoice) {
@@ -803,6 +828,9 @@ async function runAction(action, element) {
       } catch (error) {
         reportError(error);
       }
+      break;
+    case 'restock-product':
+      await restockProductWithConfirm(productId, element.dataset.qty);
       break;
     case 'set-stock-filter':
       ui.inventoryFilter = element.dataset.filter || 'all';

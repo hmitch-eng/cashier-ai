@@ -2,7 +2,7 @@ import { PAYMENT_METHODS } from '../constants.js';
 import { calculateCart } from '../commerce.js';
 import { ean13Svg } from '../ean.js';
 import { icon } from '../icons.js';
-import { invoicesInLastDays } from '../analytics.js';
+import { cartCompanions, invoicesInLastDays } from '../analytics.js';
 import {
   currencyLabel,
   formatPrice,
@@ -16,6 +16,7 @@ import {
   escapeAttr,
   escapeHtml,
   formatDate,
+  formatInvoiceCount,
   formatMoney,
   formatNumber,
   normalizeSearch,
@@ -176,10 +177,59 @@ function renderDiscountEditor(cart, settings, open) {
   `;
 }
 
+function renderCartCompanions(companions, settings) {
+  if (!companions) return '';
+  if (!companions.suggestions.length) {
+    if (companions.historyEnough) return '';
+    return `
+      <div class="cart-companions cart-companions--learning">
+        <span class="cart-companions-title">${icon('sparkles', { size: 13 })} رفيق السلة</span>
+        <p>سأقترح إضافات من فواتيرك بعد بضع عمليات بيع. الحساب يبقى في هذا المتصفح.</p>
+      </div>
+    `;
+  }
+  const paired = companions.mode === 'pair';
+  return `
+    <section class="cart-companions" aria-label="رفيق السلة — اقتراحات محلية من فواتيرك">
+      <header class="cart-companions-head">
+        <span class="cart-companions-title">${icon('sparkles', { size: 13 })} رفيق السلة</span>
+        <span class="cart-companions-source">${paired ? 'رُصدت مع سلتك' : 'الأكثر مبيعاً الآن'}</span>
+      </header>
+      <div class="cart-companions-list">
+        ${companions.suggestions
+          .map((entry) => {
+            const product = entry.product;
+            const evidence = paired
+              ? `ظهرت مع سلتك في ${formatInvoiceCount(entry.support)}`
+              : entry.categoryMatch
+                ? `الأكثر مبيعاً في ${product.category}`
+                : 'من الأكثر مبيعاً في دفترك';
+            return `
+              <div class="cart-companion">
+                ${productVisual(product, { className: 'cart-companion-art' })}
+                <div class="cart-companion-copy">
+                  <strong>${escapeHtml(product.name)}</strong>
+                  <span>${escapeHtml(evidence)}</span>
+                </div>
+                <span class="cart-companion-price mono">${escapeHtml(formatPrice(product.price, settings))}</span>
+                <button type="button" class="cart-companion-add" data-action="add-to-cart" data-id="${escapeAttr(product.id)}" aria-label="أضف ${escapeAttr(product.name)} إلى السلة" title="أضف إلى السلة">${icon('plus', { size: 14 })}</button>
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+      <p class="cart-companions-foot">محسوبة من فواتير هذا المتصفح وحدها.</p>
+    </section>
+  `;
+}
+
 function renderCart({ state, ui, cart }) {
   const settings = state.settings;
   const hasItems = cart.lineCount > 0;
   const itemLabel = cart.quantityCount === 1 ? 'قطعة واحدة' : `${formatNumber(cart.quantityCount)} قطع`;
+  const companions = hasItems
+    ? cartCompanions(state.invoices, state.products, cart.items.map((item) => item.productId))
+    : null;
   return `
     <div class="cart-backdrop ${ui.cartOpen ? 'is-visible' : ''}" data-action="close-cart" aria-hidden="true"></div>
     <aside class="cart-panel ${ui.cartOpen ? 'is-open' : ''}" id="cart-panel" aria-label="سلة الفاتورة الحالية">
@@ -197,7 +247,7 @@ function renderCart({ state, ui, cart }) {
       <div class="cart-body">
         ${
           hasItems
-            ? `<div class="cart-items">${cart.items.map((item) => renderCartItem(item, settings)).join('')}</div>`
+            ? `<div class="cart-items">${cart.items.map((item) => renderCartItem(item, settings)).join('')}</div>${renderCartCompanions(companions, settings)}`
             : `<div class="cart-empty">
                 <div class="cart-empty-art" aria-hidden="true">
                   <span class="cart-empty-bag">${icon('bag', { size: 34 })}</span>
